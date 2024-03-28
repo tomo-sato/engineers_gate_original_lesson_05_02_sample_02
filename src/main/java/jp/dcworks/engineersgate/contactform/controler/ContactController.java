@@ -35,7 +35,7 @@ public class ContactController {
 	 * [GET]初期表示処理。
 	 * 　　・入力画面を表示する。
 	 *
-	 * @param model 入力フォームのオブジェクト
+	 * @param model 画面データ受け渡しオブジェクト
 	 * @return テンプレートpath
 	 */
 	@GetMapping("contact")
@@ -52,9 +52,10 @@ public class ContactController {
 	 * 　　・入力内容にエラーがあった場合、入力画面を表示する。
 	 * 　　・エラーが無かった場合、確認画面を表示する。
 	 *
-	 * @param requestInput 入力フォームの内容
+	 * @param requestContact 入力フォームの内容
 	 * @param result バリデーション結果
 	 * @param redirectAttributes リダイレクト時に使用するオブジェクト
+	 * @param session セッションオブジェクト
 	 * @return テンプレートpath
 	 */
 	@PostMapping("contact")
@@ -63,7 +64,7 @@ public class ContactController {
 			RedirectAttributes redirectAttributes,
 			HttpSession session) {
 
-		log.info("アカウント作成処理のアクションが呼ばれました。：requestContact={}", requestContact);
+		log.info("確認画面のアクションが呼ばれました。：requestContact={}", requestContact);
 
 		// バリデーション。
 		if (result.hasErrors()) {
@@ -77,6 +78,7 @@ public class ContactController {
 			return "redirect:/contact";
 		}
 
+		// セッションに保持。メール送信処理で使用。
 		session.setAttribute("requestContact", requestContact);
 
 		// 確認画面を表示。
@@ -85,36 +87,37 @@ public class ContactController {
 
 
 	/**
-	 * [GET]メール送信処理。
+	 * [POST]メール送信処理。
 	 * 　　・セッションから値が取得できなかった場合、もしくはセッションの値が書き換えられていた場合、エラー画面を表示する。
 	 * 　　・エラーが無かった場合、確認画面を表示する。
 	 *
 	 * @param response レスポンス
 	 * @param session セッションオブジェクト
-	 * @param model 入力フォームのオブジェクト
+	 * @param model 画面データ受け渡しオブジェクト
 	 * @return テンプレートpath
 	 */
 	@PostMapping("send")
 	public String send(HttpServletResponse response, HttpSession session, Model model) {
 
-		// セッションチェック
+		// セッションチェック（セッションが生成されていなかったり、指定のキーで値が取得できなかった場合はエラー。）
 		if (session == null || session.getAttribute("requestContact") == null) {
 			log.warn("セッションから値が取得できませんでした。");
 			response.setStatus(HttpServletResponse.SC_FORBIDDEN);
 			return "Forbidden";
 		}
 
-		// セッションから入力値を取得。
+		// 確認画面でセットしたセッションから入力値を取得。
 		RequestContact requestContact = (RequestContact) session.getAttribute("requestContact");
 		// 多重送信されないようにする為、セッションクリア。
 		session.invalidate();
 
-		// セッションの値をチェック
+		// セッションの値をチェック。
 		Validator validator = Validation.buildDefaultValidatorFactory().getValidator();
 		Set<ConstraintViolation<RequestContact>> violations = validator.validate(requestContact);
 
+		// バリデーションエラーがあった場合はエラー。
 		if (violations != null && !violations.isEmpty()) {
-			log.warn("セッションの値が書き換えられた可能性があります。：violations={}", violations);
+			log.warn("セッションの値が書き換えられた可能性があります。：violations={}, requestContact={}", violations, requestContact);
 			response.setStatus(HttpServletResponse.SC_FORBIDDEN);
 			return "Forbidden";
 		}
@@ -131,9 +134,10 @@ public class ContactController {
 		} catch (Exception e) {
 			e.printStackTrace();
 
-			log.warn("メール送信時にエラーが発生しました。：requestContact={}, e={}", requestContact, e.getMessage());
-			response.setStatus(HttpServletResponse.SC_FORBIDDEN);
-			return "Forbidden";
+			// メールが送信できない状態は、異常とみなし500エラーとする。
+			log.error("メール送信時にエラーが発生しました。：requestContact={}, e={}", requestContact, e.getMessage());
+			response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+			return "Internal server error";
 		}
 
 		return "thanks";

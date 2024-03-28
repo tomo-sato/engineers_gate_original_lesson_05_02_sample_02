@@ -20,6 +20,8 @@ public class MailService {
 
 	/**
 	 * メール送信を行う。
+	 *
+	 * @param requestContact
 	 * @throws Exception
 	 */
 	public static void send(RequestContact requestContact) throws Exception {

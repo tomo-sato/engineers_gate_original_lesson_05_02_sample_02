@@ -7,7 +7,7 @@ import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 /**
- * Input DTOクラス。
+ * Contact DTOクラス。
  * コンタクト画面で入力された値を保持するクラス。
  *
  * @author tomo-sato
